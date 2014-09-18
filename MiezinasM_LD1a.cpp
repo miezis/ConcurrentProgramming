@@ -64,17 +64,48 @@ vector<Manufacturer> ReadFile(string filename){
 }
 
 void PrintTable(vector<Manufacturer> printOut){
+	cout << "-----------------------------------------------------------------------\n";
 	for(Manufacturer & manu : printOut){
-		cout << setw(70) << manu.getName() << "\n";
+		cout << right << setw(35) << manu.getName() << "\n";
+		cout << "-----------------------------------------------------------------------\n";
 		for(int i = 0; i < manu.getQuantity(); i++){
 			model forPrinting = manu.getModels().at(i);
-			cout << setw(60) << forPrinting.name << setw(8) << forPrinting.quantity << setw(5) << setprecision(2) << forPrinting.price << "\n";
+			cout 	<< left << setw(60) << forPrinting.name 
+					<< setw(8) << forPrinting.quantity 
+					<< setw(5) << setprecision(2) << forPrinting.price 
+					<< "\n";
 		}
+		cout << "-----------------------------------------------------------------------\n";
+	}
+}
+
+void PrintManufacturerModels(Manufacturer printOut, string procNum){
+	int i = 0;
+	for(model &mod : printOut.getModels()){
+		cout 	<< left << setw(20) << procNum 
+				<< setw(5) << i 
+				<< setw(30) << mod.name 
+				<< setw(5) << mod.quantity 
+				<< setw(5) << mod.price << "\n";
+		i++;
 	}
 }
 
 int main() {
 	vector<Manufacturer> AllModels = ReadFile(DataFile);
+	vector<thread> threads;
+	int i = 0;
+
 	PrintTable(AllModels);
+
+	for(Manufacturer &manu : AllModels) {
+		threads.push_back(thread(PrintManufacturerModels, manu, "procesas_" + to_string(i)));
+		i++;
+	}
+
+	for (thread &t: threads) {
+        t.join();
+    }
+
 	return 0;
 }
