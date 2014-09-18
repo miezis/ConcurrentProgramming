@@ -53,7 +53,7 @@ vector<Manufacturer> ReadFile(string filename){
 			vector<model> models;
 			for(int i = 0; i < count; i++){
 				model modelis;
-				cin >> modelis.name >> modelis.quantity >> modelis.price;
+				fin >> modelis.name >> modelis.quantity >> modelis.price;
 				models.push_back(modelis);
 			}
 			AllModels.push_back(Manufacturer(title, count, models));
@@ -76,4 +76,5 @@ void PrintTable(vector<Manufacturer> printOut){
 int main() {
 	vector<Manufacturer> AllModels = ReadFile(DataFile);
 	PrintTable(AllModels);
+	return 0;
 }
