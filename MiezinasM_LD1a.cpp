@@ -1,3 +1,14 @@
+/**
+ * 1. Kiek iteracijų iš eilės padaro vienas procesas?
+ * Ats.: atsitiktinį skaičių
+ *
+ * 2. Kokia tvarka atspausdinami to paties masyvo duomenys? 
+ * Ats.: tokia, kokia surašyti
+ * 
+ * Kokia tvarka vykdomi procesai?
+ * Ats.: atsitiktine
+*/
+
 #include <iostream>
 #include <thread>
 #include <string>
@@ -72,7 +83,7 @@ void PrintTable(vector<Manufacturer> printOut){
 			model forPrinting = manu.getModels().at(i);
 			cout 	<< left << setw(60) << forPrinting.name 
 					<< setw(8) << forPrinting.quantity 
-					<< setw(5) << setprecision(2) << forPrinting.price 
+					<< setw(5) << setprecision(4) << forPrinting.price 
 					<< "\n";
 		}
 		cout << "-----------------------------------------------------------------------\n";
@@ -86,7 +97,7 @@ void PrintManufacturerModels(Manufacturer printOut, string procNum){
 				<< setw(5) << i 
 				<< setw(30) << mod.name 
 				<< setw(5) << mod.quantity 
-				<< setw(5) << mod.price << "\n";
+				<< setw(5) << setprecision(4) << mod.price << "\n";
 		i++;
 	}
 }
