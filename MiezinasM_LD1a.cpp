@@ -79,9 +79,13 @@ void PrintTable(vector<Manufacturer> printOut){
 	for(Manufacturer & manu : printOut){
 		cout << right << setw(35) << manu.getName() << "\n";
 		cout << "-----------------------------------------------------------------------\n";
+		cout 	<< left << setw(63) << "Modelio Pavadinimas"
+				<< setw(8) << "Kiekis"
+				<< setw(5) << "Kaina" << "\n";
 		for(int i = 0; i < manu.getQuantity(); i++){
 			model forPrinting = manu.getModels().at(i);
-			cout 	<< left << setw(60) << forPrinting.name 
+			cout 	<< left << setw(3) << to_string(i+1) + ")" 
+					<< setw(60) << forPrinting.name 
 					<< setw(8) << forPrinting.quantity 
 					<< setw(5) << setprecision(4) << forPrinting.price 
 					<< "\n";
