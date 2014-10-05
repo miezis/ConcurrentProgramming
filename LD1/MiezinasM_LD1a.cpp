@@ -5,27 +5,30 @@
  * 2. Kokia tvarka atspausdinami to paties masyvo duomenys? 
  * Ats.: tokia, kokia surašyti
  * 
- * Kokia tvarka vykdomi procesai?
+ * 3. Kokia tvarka vykdomi procesai?
  * Ats.: atsitiktine
 */
 
 #include <iostream>
+#include <thread>
 #include <string>
 #include <fstream>
 #include <vector>
 #include <iomanip>
-#include <omp.h>
 
 using namespace std;
 
+//konstanta duomenu failo pavadinimui
 const char DataFile[] = "MiezinasM.txt";
 
+//bazine struktura saugoti vienam modelio irasui
 struct model {
 	string name;
 	int quantity;
 	double price;
 };
 
+//konteinerine klase, skirta saugoti modeliams (vektoriu)
 class Manufacturer {
 private:
 	string name;
@@ -51,6 +54,32 @@ public:
 	}
 };
 
+//Funkciju prototipai
+vector<Manufacturer> ReadFile(string filename);
+void PrintTable(vector<Manufacturer> printOut);
+void PrintManufacturerModels(Manufacturer printOut, string procNum);
+
+int main() {
+	vector<Manufacturer> AllModels = ReadFile(DataFile);
+	vector<thread> threads;
+	int i = 1;
+
+	PrintTable(AllModels);
+
+	//Inicializuojame gijas, perduodami funkcija bei jos argumentus
+	for(Manufacturer &manu : AllModels) {
+		threads.push_back(thread(PrintManufacturerModels, manu, "procesas_" + to_string(i)));
+		i++;
+	}
+
+	//prijungiame gijas prie pagr. proceso
+	for (thread &t: threads) {
+        t.join();
+    }
+
+	return 0;
+}
+
 vector<Manufacturer> ReadFile(string filename){
 	vector<Manufacturer> AllModels;
 	string title;
@@ -75,10 +104,10 @@ vector<Manufacturer> ReadFile(string filename){
 }
 
 void PrintTable(vector<Manufacturer> printOut){
-	cout << "-----------------------------------------------------------------------\n";
+	cout << "-----------------------------------------------------------------------------\n";
 	for(Manufacturer & manu : printOut){
 		cout << right << setw(35) << manu.getName() << "\n";
-		cout << "-----------------------------------------------------------------------\n";
+		cout << "-----------------------------------------------------------------------------\n";
 		cout 	<< left << setw(63) << "Modelio Pavadinimas"
 				<< setw(8) << "Kiekis"
 				<< setw(5) << "Kaina" << "\n";
@@ -90,12 +119,12 @@ void PrintTable(vector<Manufacturer> printOut){
 					<< setw(5) << setprecision(4) << forPrinting.price 
 					<< "\n";
 		}
-		cout << "-----------------------------------------------------------------------\n";
+		cout << "-----------------------------------------------------------------------------\n";
 	}
 }
 
 void PrintManufacturerModels(Manufacturer printOut, string procNum){
-	int i = 0;
+	int i = 1;
 	for(model &mod : printOut.getModels()){
 		cout 	<< left << setw(20) << procNum 
 				<< setw(5) << i 
@@ -104,31 +133,4 @@ void PrintManufacturerModels(Manufacturer printOut, string procNum){
 				<< setw(5) << setprecision(4) << mod.price << "\n";
 		i++;
 	}
-}
-
-int main() {
-	vector<Manufacturer> AllModels = ReadFile(DataFile);
-	//vector<thread> threads;
-	int i = 0;
-
-	PrintTable(AllModels);
-
-	omp_set_num_threads(AllModels.size());
-
-	#pragma omp parallel private(i)
-	{
-		i = omp_get_thread_num();
-		PrintManufacturerModels(AllModels.at(i), "procesas_" + to_string(i));
-	}
-/*
-	for(Manufacturer &manu : AllModels) {
-		threads.push_back(thread(PrintManufacturerModels, manu, "procesas_" + to_string(i)));
-		i++;
-	}
-
-	for (thread &t: threads) {
-        t.join();
-    }
-*/
-	return 0;
 }

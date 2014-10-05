@@ -5,27 +5,30 @@
  * 2. Kokia tvarka atspausdinami to paties masyvo duomenys? 
  * Ats.: tokia, kokia surašyti
  * 
- * Kokia tvarka vykdomi procesai?
+ * 3. Kokia tvarka vykdomi procesai?
  * Ats.: atsitiktine
 */
 
 #include <iostream>
-#include <thread>
 #include <string>
 #include <fstream>
 #include <vector>
 #include <iomanip>
+#include <omp.h>
 
 using namespace std;
 
+//konstanta duomenu failo pavadinimui
 const char DataFile[] = "MiezinasM.txt";
 
+//bazine struktura saugoti vienam modelio irasui
 struct model {
 	string name;
 	int quantity;
 	double price;
 };
 
+//konteinerine klase, skirta saugoti modeliams (vektoriu)
 class Manufacturer {
 private:
 	string name;
@@ -50,6 +53,30 @@ public:
 		return this->models;
 	}
 };
+
+//Funkciju prototipai
+vector<Manufacturer> ReadFile(string filename);
+void PrintTable(vector<Manufacturer> printOut);
+void PrintManufacturerModels(Manufacturer printOut, string procNum);
+
+int main() {
+	vector<Manufacturer> AllModels = ReadFile(DataFile);
+	int i;	//proceso numeriui saugot
+
+
+	PrintTable(AllModels);
+
+	//nustatom kiek giju kursime
+	omp_set_num_threads(AllModels.size());
+	//lygiagrecioji dalis
+	#pragma omp parallel private(i)
+	{
+		i = omp_get_thread_num();
+		PrintManufacturerModels(AllModels.at(i), "procesas_" + to_string(i + 1));
+	}
+
+	return 0;
+}
 
 vector<Manufacturer> ReadFile(string filename){
 	vector<Manufacturer> AllModels;
@@ -98,29 +125,10 @@ void PrintManufacturerModels(Manufacturer printOut, string procNum){
 	int i = 0;
 	for(model &mod : printOut.getModels()){
 		cout 	<< left << setw(20) << procNum 
-				<< setw(5) << i 
+				<< setw(5) << (i + 1) 
 				<< setw(30) << mod.name 
 				<< setw(5) << mod.quantity 
 				<< setw(5) << setprecision(4) << mod.price << "\n";
 		i++;
 	}
-}
-
-int main() {
-	vector<Manufacturer> AllModels = ReadFile(DataFile);
-	vector<thread> threads;
-	int i = 0;
-
-	PrintTable(AllModels);
-
-	for(Manufacturer &manu : AllModels) {
-		threads.push_back(thread(PrintManufacturerModels, manu, "procesas_" + to_string(i)));
-		i++;
-	}
-
-	for (thread &t: threads) {
-        t.join();
-    }
-
-	return 0;
 }
