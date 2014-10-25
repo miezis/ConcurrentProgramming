@@ -13,39 +13,57 @@
 using namespace std;
 
 //kintamieji parodantys darbu pabaiga
-volatile bool doneMaking = false;
-volatile bool doneUsing = false;
+volatile bool 	doneMaking = false;
+volatile bool 	doneUsing = false;
 
 //konstanta duomenu failo pavadinimui
-const char DataFile[] = "MiezinasM_L2.txt";
-const int MAX_THREADS = 5;
-const int MAX_ARRAY_SIZE = 10;
+const char 		DataFile[] = "MiezinasM_L2.txt";
 
-//bazine struktura saugoti vienam modelio irasui
+/*
+============================================================================
+
+	Bazine struktura saugoti vienam modelio irasui
+
+============================================================================
+*/
+
 struct model {
-	string name;
-	int quantity;
-	double price;
+	string 	name;
+	int 	quantity;
+	double 	price;
 };
 
-//paprastas skaitliukas, aprasyti operatoriai norint lengvai su juo dirbti
+/*
+============================================================================
+
+	Skaitliukas su uzklotais operatoriais, kad butu lengviau dirbti
+
+============================================================================
+*/
+
 struct Counter {
-	double price;
-	int count;
+	double 	price;
+	int 	count;
 public:
-	//Counter(double price, int count):price(price), count(count){}
-	int operator++(){return ++count;}
-	int operator--(){return --count;}
-	bool operator==(const Counter &other){return price == other.price;}
-	bool operator<(const Counter &other){return price < other.price;}
+	int 	operator++(){return ++count;}
+	int 	operator--(){return --count;}
+	bool 	operator==(const Counter &other){return price == other.price;}
+	bool 	operator<(const Counter &other){return price < other.price;}
 };
 
-//konteinerine klase, skirta saugoti modeliams (vektoriu)
+/*
+============================================================================
+
+	konteinerine klase, skirta saugoti modeliams (vektoriu)
+
+============================================================================
+*/
+
 class Manufacturer {
 private:
-	string name;
-	int quantity;
-	vector<model> models;
+	string 			name;
+	int 			quantity;
+	vector<model> 	models;
 public:
 	Manufacturer(string name, int quantity, vector<model> models) {
 		this->name = name;
@@ -64,24 +82,32 @@ public:
 };
 
 
-//buferis apsaugotas nuo maigymo is keliu giju
+/*
+============================================================================
+
+	Monitoriaus implementacija su salygine sinchronizacija
+
+============================================================================
+*/
+
 class Monitor {
-	vector<Counter> buffer;//duomenys
-	condition_variable accessCondition;//salyginins kintamasis naudojamas uzrakint bendra priejima
-	condition_variable emptyCondition;//salyginins kintamasis naudojamas uzrakinti gijas, kol buferis yra tuscias
-	bool accessing;
-	mutex mtx;
+	vector<Counter> 	buffer;				//duomenys
+	condition_variable 	accessCondition;	//rakinti bendra priejimma
+	condition_variable 	emptyCondition;		//rakinti kol vektorius tuscias
+	bool 				accessing;			//ar siuo metu naudojam
+	mutex 				mtx;
 public:
 	Monitor() : accessing(false){}
+
 	bool Add(Counter c) {
 		if(doneUsing)
 			return false;
 		LockAccess();
-		//randamas atitinkamo pavadinimo skaitliukas
+		//randamas reikiamos kainos elementas
 		auto i = find(buffer.begin(), buffer.end(), c);
 		if(i != buffer.end()) {
 			(*i).count += c.count;
-		} else { //jei skaitliuko neradome, kuriame nauja reikiamoje vietoje
+		} else { //jei nerasta, tuomet kuriame nauja
 			auto size = buffer.size();
 			for(auto i = buffer.begin(); i != buffer.end(); i++) {
 				if(c < (*i)) {
@@ -92,28 +118,28 @@ public:
 			if(buffer.size() == size)
 				buffer.push_back(c);
 		}
-		//pazadinamas viena duomenu laukianti gija
+		//pazadinama duomenu laukianti gija (viena)
 		emptyCondition.notify_one();
 		UnlockAcces();
 		return true;
 	}
+
 	int Take(Counter c) {
 		unique_lock<mutex> lock(mtx);
-		//laukiama jei buferis yra tuscias ir nebaigta rasyti
-		//sis tikrinimas ar nebaigta rasyti nera butinas, bet turi galimybe sukelti deadlock
+		//salygine sinchronizacija, neimame kol tuscia
 		emptyCondition.wait(lock, [=]{return buffer.size() > 0 || doneMaking;});
 		lock.unlock();
 		LockAccess();
-		//randamas atitinkamas skaitliukas
+		//randamas reikiamos kainos elementas
 		auto i = find(buffer.begin(), buffer.end(), c);
 		int taken = 0;
-		if(i != buffer.end()) { //paimame kiek imanoma
+		if(i != buffer.end()) { //paimama imanomas kiekis
 			if((*i).count >= c.count)
 				taken = c.count;
 			else
 				taken = (*i).count;
 			(*i).count -= taken;
-			//triname tuscia skaitliuka
+			//trinamas tuscias skaitliukas
 			if((*i).count <= 0)
 			buffer.erase(i);
 		}
@@ -121,21 +147,25 @@ public:
 		emptyCondition.notify_one();
 		return taken;
 	}
+
 	int Size() {
 		LockAccess();
 		int size = buffer.size();
 		UnlockAcces();
 		return size;
 	}
+
 	string Print() {
 		stringstream ss;
 		for(auto &c : buffer)
 			ss << c.price << " " << c.count << endl;
 		return ss.str();
-		}
+	}
+
 	void Done() {
 		emptyCondition.notify_all();
 	}
+
 private:
 	void LockAccess() {
 		unique_lock<mutex> lock(mtx);
@@ -149,21 +179,22 @@ private:
 	}
 };
 
-//Funkciju prototipai
+/*
+Funkciju prototipai
+*/
 vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users);
 void PrintTable(vector<Manufacturer> printOut, vector<vector<Counter>> users);
-void PrintManufacturerModels(Manufacturer printOut, string procNum);
 void Make(Manufacturer stuff);
 void Use(vector<Counter> stuff);
-
 
 Monitor buffer;
 
 int main() {
-	vector<vector<Counter>> Users;
-	vector<Manufacturer> AllModels;
-	vector<thread> Using;
-	vector<thread> Making;
+	vector<vector<Counter>> 	Users;
+	vector<Manufacturer> 		AllModels;
+	vector<thread> 				Using;
+	vector<thread> 				Making;
+
 	AllModels = ReadFile(DataFile, Users);
 	PrintTable(AllModels, Users);
 
@@ -177,6 +208,7 @@ int main() {
 	
 	for(auto &v : Making)
 		v.join();
+
 	buffer.Done();
 	doneMaking = true;
 
@@ -187,14 +219,25 @@ int main() {
 	return 0;
 }
 
-vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users){
-	bool readUsers = false;
-	vector<Manufacturer> AllModels;
-	vector<Counter> temp;
-	string title;
-	int count;
-	ifstream fin(filename);
+/*
+============================================================================
+ReadFile
 
+	Pradiniu duomenu nuskaitymo funkcija, grazina gamintoju sarasa, o
+	vartotoju sarasas uzpildomas padavus funkcijai nuoroda i ji.
+
+	Perdarinejant su getline gavosi labai netvarkingas ir negrazus kodas.
+============================================================================
+*/
+
+vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users){
+	bool 					readUsers = false;
+	vector<Manufacturer> 	AllModels;
+	vector<Counter> 		temp;
+	string 					title;
+	int 					count;
+	
+	ifstream fin(filename);
 	if(!fin) {
 		cerr << "Couldn't open file!\n";
 	} else {
@@ -214,8 +257,6 @@ vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users){
 				start = end + 1;
 				end = line.find('\n', start);
 				count = atoi(line.substr(start, end - start).c_str());
-				//count = stoi(count);
-				//line >> title >> count;
 				vector<model> models;
 				for(int i = 0; i < count; i++){
 					model modelis;
@@ -229,7 +270,6 @@ vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users){
 					start = end + 1;
 					end = line.find('\n', start);
 					modelis.price = atof(line.substr(start, end - start).c_str());
-					//fin >> modelis.name >> modelis.quantity >> modelis.price;
 					models.push_back(modelis);
 				}
 				AllModels.push_back(Manufacturer(title, count, models));
@@ -253,6 +293,14 @@ vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users){
 	}	
 	return AllModels;
 }
+
+/*
+============================================================================
+PrintTable
+
+	Atspausdina pradinius duomenis lentelemis
+============================================================================
+*/
 
 void PrintTable(vector<Manufacturer> printOut, vector<vector<Counter>> users){
 	cout << "-----------------------------------------------------------------------------\n";
@@ -285,17 +333,13 @@ void PrintTable(vector<Manufacturer> printOut, vector<vector<Counter>> users){
 	}
 }
 
-void PrintManufacturerModels(Manufacturer printOut, string procNum){
-	int i = 1;
-	for(model &mod : printOut.getModels()){
-		cout << left << setw(20) << procNum
-			 << setw(5) << i
-			 << setw(30) << mod.name
-			 << setw(5) << mod.quantity
-			 << setw(5) << setprecision(4) << mod.price << "\n";
-		i++;
-	}
-}
+/*
+============================================================================
+Make
+
+	Gamintojo funkcija, dedami elementai i bendra atminti.
+============================================================================
+*/
 
 void Make(Manufacturer stuff) {
 	for(auto &s : stuff.getModels()) {
@@ -305,18 +349,23 @@ void Make(Manufacturer stuff) {
 		buffer.Add(tmp);
 	}
 }
-//vartojimo funkcija
+
+/*
+============================================================================
+Use
+
+	Vartotojo funkcija, elementai imami is bendros atminties.
+============================================================================
+*/
+
 void Use(vector<Counter> stuff) {
 	auto i = stuff.begin();
-	vector<Counter> ret;
 	while((!doneMaking || buffer.Size() > 0) && stuff.size() > 0) {
 		i++;
 		if(i == stuff.end())
 			i = stuff.begin();
 		int taken = buffer.Take(*i);
 		(*i).count -= taken;
-		if(taken == 0 && doneMaking)
-			ret.push_back(*i);
 		if((*i).count <= 0 || (taken == 0 && doneMaking)) {
 			stuff.erase(i);
 			i = stuff.begin();

@@ -1,6 +1,6 @@
 ConcurrentProgramming
 =====================
 
-ConcurrentProgramming works for university
+ConcurrentProgramming assignments for university
 
 Donate beers, please
