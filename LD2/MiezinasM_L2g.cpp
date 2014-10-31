@@ -1,5 +1,5 @@
 //Mantas Miezinas 10
-//daznai buna deadlock
+//kartais buna deadlock
 #include <mutex>
 #include <condition_variable>
 #include <iostream>
@@ -9,7 +9,6 @@
 using namespace std;
 
 volatile bool doneUsing = false;
-mutex mtx;
 
 class semaphore {
 private:
@@ -53,8 +52,6 @@ int main() {
 		Making.emplace_back(Make, (i + 2));
 	}
 
-	
-
 	for(auto &v : Making)
 		v.join();
 
@@ -70,7 +67,7 @@ void Make(int add) {
 	int used;
 	while(!doneUsing){
 		S.acquire();
-		if(howMany % 2 == 0 && howMany != used){
+		if((howMany % 2 == 0 && howMany != used) || (howMany % 3 == 0 && howMany != used)){
 			common += add;
 			used = howMany;
 		}
