@@ -205,7 +205,7 @@ int main() {
 	for(auto &v : Users)
 		Using.emplace_back(Use, v);
 
-	
+
 	for(auto &v : Making)
 		v.join();
 
@@ -214,7 +214,7 @@ int main() {
 
 	for(auto &v : Using)
 		v.join();
-	
+
 	cout << "Nesuvartota liko:\n\n" << buffer.Print();
 	return 0;
 }
@@ -236,7 +236,7 @@ vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users){
 	vector<Counter> 		temp;
 	string 					title;
 	int 					count;
-	
+
 	ifstream fin(filename);
 	if(!fin) {
 		cerr << "Couldn't open file!\n";
@@ -290,7 +290,7 @@ vector<Manufacturer> ReadFile(string filename, vector<vector<Counter>> &users){
 			}
 		}
 		fin.close();
-	}	
+	}
 	return AllModels;
 }
 
