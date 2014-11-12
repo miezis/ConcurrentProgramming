@@ -147,10 +147,23 @@ func check(e error) {
 	}
 }
 
-func ReadFile(Allmodels []manufacturer, users []counterSlice) {
+/*
+============================================================================
+ReadFile
+
+	Pradiniu duomenu nuskaitymo funkcija, grazina gamintoju sarasa, o
+	vartotoju sarasas uzpildomas padavus funkcijai nuoroda i ji.
+
+	Perdarinejant su getline gavosi labai netvarkingas ir negrazus kodas.
+============================================================================
+*/
+
+func ReadFile() ([]manufacturer, []counterSlice) {
+	var Allmodels []manufacturer
+	var users []counterSlice
 	var readUsers bool = false
 	var temp counterSlice
-	//lines, err := readLines(DataFile)
+
 	file, err := os.Open(DataFile)
 	check(err)
 	read := bufio.NewReader(file)
@@ -197,6 +210,7 @@ func ReadFile(Allmodels []manufacturer, users []counterSlice) {
 		}
 	}
 	file.Close()
+	return Allmodels, users
 }
 
 func main() {
@@ -204,31 +218,10 @@ func main() {
 	var AllModels []manufacturer
 	var Users []counterSlice
 
-	ReadFile(AllModels, Users)
+	AllModels, Users = ReadFile()
 
-	file, err := os.Open("../LD2/" + DataFile)
-	check(err)
-	r := bufio.NewReader(file)
-	l, _, err := r.ReadLine()
-	s := strings.Split(string(l), " ")
-	ciuju, _ := strconv.Atoi(s[1])
-	fmt.Println(ciuju)
-
-	//s := strings.Split("127.0.0.1:5432", ":")
-	//ip, port := s[0], s[1]
-	//fmt.Println(ip, port)
-
-	var datsas string = "Datsun240z	8	20.33"
-
-	stringas := strings.Split(datsas, "\t")
-
-	masina, intas := stringas[0], stringas[1]
-
-	var test int
-
-	test, err = strconv.Atoi(intas)
-
-	fmt.Println(masina+"\n", test, "\n", err)
+	fmt.Println(AllModels)
+	fmt.Println(Users)
 
 	// `var` declares 1 or more variables.
 	var a string = "initial"
