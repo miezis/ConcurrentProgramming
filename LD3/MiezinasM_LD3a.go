@@ -151,10 +151,9 @@ func check(e error) {
 ============================================================================
 ReadFile
 
-	Pradiniu duomenu nuskaitymo funkcija, grazina gamintoju sarasa, o
-	vartotoju sarasas uzpildomas padavus funkcijai nuoroda i ji.
+	Pradiniu duomenu nuskaitymo funkcija, grazina gamintoju ir vartotoju
+	sarasa.
 
-	Perdarinejant su getline gavosi labai netvarkingas ir negrazus kodas.
 ============================================================================
 */
 
@@ -213,6 +212,29 @@ func ReadFile() ([]manufacturer, []counterSlice) {
 	return Allmodels, users
 }
 
+func PrintTable(printOut []manufacturer, users []counterSlice) {
+	fmt.Println("-----------------------------Pradiniai Duomenys------------------------------")
+	for _, element := range printOut {
+		fmt.Println(element.name)
+		fmt.Println("-----------------------------------------------------------------------------")
+		fmt.Printf("%20v %45v %10v\n", "Modelio Pavadinimas", "Kiekis", "Kaina")
+		for i, modelis := range element.models {
+			fmt.Printf("%2s %17s %45d %10.2f\n", strconv.Itoa(i+1)+")", modelis.name, modelis.quantity, modelis.price)
+		}
+		fmt.Println("-----------------------------------------------------------------------------")
+	}
+	fmt.Println("------------------------------------Users------------------------------------")
+	for i, element := range users {
+		fmt.Printf("%s %d\n", "User Nr.", i)
+		fmt.Println("------------")
+		fmt.Println("Price  Count")
+		for _, user := range element {
+			fmt.Printf("%5.2f  %5d\n", user.price, user.count)
+		}
+		fmt.Println("------------")
+	}
+}
+
 func main() {
 
 	var AllModels []manufacturer
@@ -220,26 +242,11 @@ func main() {
 
 	AllModels, Users = ReadFile()
 
-	fmt.Println(AllModels)
-	fmt.Println(Users)
-
-	// `var` declares 1 or more variables.
-	var a string = "initial"
-	fmt.Println(a)
-
-	// You can declare multiple variables at once.
-	var b, c int = 1, 2
-	fmt.Println(b, c)
+	PrintTable(AllModels, Users)
 
 	// Go will infer the type of initialized variables.
 	var d = true
 	fmt.Println(d)
-
-	// Variables declared without a corresponding
-	// initialization are _zero-valued_. For example, the
-	// zero value for an `int` is `0`.
-	var e int
-	fmt.Println(e)
 
 	// The `:=` syntax is shorthand for declaring and
 	// initializing a variable, e.g. for
