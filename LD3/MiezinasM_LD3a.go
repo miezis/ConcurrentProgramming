@@ -1,7 +1,6 @@
 package main
 
 import "fmt"
-import "math"
 import "os"
 import "bufio"
 import "io"
@@ -66,8 +65,7 @@ type manufacturer struct {
 }
 
 type buffer struct {
-	buff    counterSlice
-	channel chan counter
+	buff counterSlice
 }
 
 func (b buffer) Add(c *counter) {
@@ -124,21 +122,6 @@ func (b buffer) Print() {
 	for v := range b.buff {
 		fmt.Println("%+v", v)
 	}
-}
-
-func readLines(path string) ([]string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	return lines, scanner.Err()
 }
 
 func check(e error) {
@@ -235,7 +218,39 @@ func PrintTable(printOut []manufacturer, users []counterSlice) {
 	}
 }
 
+func Use(channel chan counter, user counterSlice, isDone chan bool) {
+	for i := range user {
+		channel <- user[i]
+		<-isDone
+	}
+}
+
+func Make(channel chan counter, models manufacturer) {
+	for _, element := range models.models {
+		channel <- counter{element.price, element.quantity}
+	}
+}
+
+func Valdytojas(userChannels []chan counter, producerChannels []chan counter, isDone []chan bool, done chan bool) {
+	var buff buffer
+
+	for _, channel := range producerChannels {
+		counter := <-channel
+		buff.Add(&counter)
+	}
+
+	for i, channel := range userChannels {
+		counter := <-channel
+		buff.Take(&counter)
+		isDone[i] <- true
+	}
+
+	done <- true
+	buff.Print()
+}
+
 func main() {
+	done := make(chan bool)
 
 	var AllModels []manufacturer
 	var Users []counterSlice
@@ -244,50 +259,30 @@ func main() {
 
 	PrintTable(AllModels, Users)
 
-	// Go will infer the type of initialized variables.
-	var d = true
-	fmt.Println(d)
+	var producerMessages []chan counter
+	var consumerMessages []chan counter
+	var isDone []chan bool
 
-	// The `:=` syntax is shorthand for declaring and
-	// initializing a variable, e.g. for
-	// `var f string = "short"` in this case.
-	f := "short"
-	fmt.Println(f)
-
-	fmt.Println(DataFile)
-	const n = 500000000
-	fmt.Println(math.Sin(n))
-
-	fmt.Println(int64(n))
-
-	// The most basic type, with a single condition.
-	i := 1
-	for i <= 3 {
-		fmt.Println(i)
-		i = i + 1
+	for i := 0; i < len(AllModels); i++ {
+		producerMessages = append(producerMessages, make(chan counter))
 	}
 
-	// A classic initial/condition/after `for` loop.
-	for j := 7; j <= 9; j++ {
-		fmt.Println(j)
+	for i := 0; i < len(Users); i++ {
+		consumerMessages = append(consumerMessages, make(chan counter))
+		isDone = append(isDone, make(chan bool))
+	}
+	fmt.Println(len(isDone))
+	fmt.Println(len(producerMessages))
+	fmt.Println(len(consumerMessages))
+
+	go Valdytojas(consumerMessages, producerMessages, isDone, done)
+
+	for i, element := range AllModels {
+		go Make(producerMessages[i], element)
 	}
 
-	// `for` without a condition will loop repeatedly
-	// until you `break` out of the loop or `return` from
-	// the enclosing function.
-	for {
-		fmt.Println("loop")
-		break
+	for i, element := range Users {
+		go Use(consumerMessages[i], element, isDone[i])
 	}
-
-	if 7%2 == 0 {
-		fmt.Println("7 is even")
-	} else {
-		fmt.Println("7 is odd")
-	}
-
-	var az [5]int
-	fmt.Println("emp:", az)
-
-	fmt.Println("len:", len(az))
+	<-done
 }
