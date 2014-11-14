@@ -253,12 +253,12 @@ func Make(producerMessages chan counter, models manufacturer) {
 
 func Valdytojas(userChannels chan counter, producerChannels chan counter, done chan bool, buff *buffer, taken chan counter, howMuch int, removes int) {
 
-	for i, j := 0, 0; i < howMuch && j <= removes+2; {
+	for i := 0; i < howMuch+removes; {
 		select {
 		case counter := <-producerChannels:
 			{
 				buff.Add(&counter)
-				fmt.Println("received from producers ", i, j, counter)
+				fmt.Println("received from producers ", i, counter)
 				fmt.Println(buff.buff)
 				i++
 			}
@@ -266,8 +266,8 @@ func Valdytojas(userChannels chan counter, producerChannels chan counter, done c
 			{
 				fmt.Println("received form users", i, counter)
 				counter.count -= buff.Take(&counter)
-				if counter.count < 1 {
-					j++
+				if counter.count == 0 {
+					i++
 				} else {
 					taken <- counter
 				}
