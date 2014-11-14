@@ -102,16 +102,18 @@ func (b *buffer) Take(c *counter) uint {
 			var j uint
 			if b.buff[i].count >= c.count {
 				j = c.count
-				b.buff[i].count -= c.count
 			} else {
 				j = b.buff[i].count
-				b.buff[i].count -= j
 
+				//b.buff[] = append(b.buff[:i-1], b.buff[i:])
+			}
+			b.buff[i].count -= j
+			if b.buff[i].count <= 0 {
 				copy(b.buff[:i-1], b.buff[i:])
 				b.buff[len(b.buff)-1] = counter{}
 				b.buff = b.buff[:len(b.buff)-1]
-				//b.buff[] = append(b.buff[:i-1], b.buff[i:])
 			}
+
 			return j
 		}
 	}
@@ -218,10 +220,14 @@ func PrintTable(printOut []manufacturer, users []counterSlice) {
 	}
 }
 
-func Use(channel chan counter, user counterSlice, isDone chan bool) {
-	for i := range user {
-		channel <- user[i]
-		<-isDone
+func Use(channel chan counter, user counterSlice, taken chan counter) {
+	for _, el := range user {
+		channel <- el
+		c := <-taken
+		for c.count > 0 {
+			channel <- c
+			c = <-taken
+		}
 	}
 }
 
@@ -231,18 +237,19 @@ func Make(channel chan counter, models manufacturer) {
 	}
 }
 
-func Valdytojas(userChannels []chan counter, producerChannels []chan counter, isDone []chan bool, done chan bool, buff *buffer) {
+func Valdytojas(userChannels chan counter, producerChannels chan counter, done chan bool, buff *buffer, taken chan counter) {
 
-	for _, channel := range producerChannels {
-		counter := <-channel
-		buff.Add(&counter)
-	}
+	for i := 0; i < 50000; i++ {
+		select {
+		case counter := <-producerChannels:
+			buff.Add(&counter)
+		case counter := <-userChannels:
+			{
+				counter.count -= buff.Take(&counter)
+				taken <- counter
+			}
 
-	for i, channel := range userChannels {
-		counter := <-channel
-		counter.count -= buff.Take(&counter)
-		if counter.count == 0 {
-			isDone[i] <- true
+		default:
 		}
 	}
 
@@ -251,7 +258,7 @@ func Valdytojas(userChannels []chan counter, producerChannels []chan counter, is
 }
 
 func main() {
-	done := make(chan bool)
+	done := make(chan bool, 1)
 
 	var buff buffer
 	var AllModels []manufacturer
@@ -261,31 +268,23 @@ func main() {
 
 	PrintTable(AllModels, Users)
 
-	var producerMessages []chan counter
-	var consumerMessages []chan counter
-	var isDone []chan bool
+	var producerMessages chan counter
+	var consumerMessages chan counter
+	var taken chan counter
+	//	var isDone []chan bool
 
-	for i := 0; i < len(AllModels); i++ {
-		producerMessages = append(producerMessages, make(chan counter))
+	producerMessages = make(chan counter, len(AllModels))
+	consumerMessages = make(chan counter, len(Users))
+	taken = make(chan counter, len(Users))
+	for _, element := range AllModels {
+		go Make(producerMessages, element)
 	}
 
-	for i := 0; i < len(Users); i++ {
-		consumerMessages = append(consumerMessages, make(chan counter))
-		isDone = append(isDone, make(chan bool))
-	}
-	fmt.Println(len(isDone))
-	fmt.Println(len(producerMessages))
-	fmt.Println(len(consumerMessages))
-
-	go Valdytojas(consumerMessages, producerMessages, isDone, done, &buff)
-
-	for i, element := range AllModels {
-		go Make(producerMessages[i], element)
+	for _, element := range Users {
+		go Use(consumerMessages, element, taken)
 	}
 
-	for i, element := range Users {
-		go Use(consumerMessages[i], element, isDone[i])
-	}
+	go Valdytojas(consumerMessages, producerMessages, done, &buff, taken)
 
 	<-done
 	buff.Print()
