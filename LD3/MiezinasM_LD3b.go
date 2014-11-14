@@ -47,12 +47,9 @@ func (slice *counterSlice) find(value float32) int {
 }
 
 func (slice *counterSlice) getPos(value float32) int {
-	curPos := 0
 	for pos, v := range *slice {
-		if v.price < value {
-			curPos = pos
-		} else {
-			return curPos
+		if v.price > value {
+			return pos
 		}
 	}
 	return -1
@@ -77,7 +74,13 @@ func (b *buffer) Add(c *counter) {
 			if j == -1 {
 				b.buff = append(b.buff, *c)
 			} else {
+				//b.buff[j] = *c
+
+				b.buff = append(b.buff, counter{})
+				copy(b.buff[j+1:], b.buff[j:])
 				b.buff[j] = *c
+				fmt.Println("added to pos: ", j)
+				fmt.Println("my val", c)
 			}
 		}
 	default:
@@ -109,7 +112,7 @@ func (b *buffer) Take(c *counter) uint {
 			}
 			b.buff[i].count -= j
 			if b.buff[i].count <= 0 {
-				copy(b.buff[:i-1], b.buff[i:])
+				copy(b.buff[i:], b.buff[i+1:])
 				b.buff[len(b.buff)-1] = counter{}
 				b.buff = b.buff[:len(b.buff)-1]
 			}
@@ -220,36 +223,59 @@ func PrintTable(printOut []manufacturer, users []counterSlice) {
 	}
 }
 
-func Use(channel chan counter, user counterSlice, taken chan counter) {
+func Use(consumerMessages chan counter, user counterSlice, taken chan counter) {
 	for _, el := range user {
-		channel <- el
-		c := <-taken
-		for c.count > 0 {
-			channel <- c
-			c = <-taken
+		consumerMessages <- el
+		//c := <-taken
+		//fmt.Println("user received from taken: ", c.count)
+	consume:
+		select {
+		case c := <-taken:
+			{
+				consumerMessages <- c
+				goto consume /*
+					for c.count > 0 {
+						consumerMessages <- c
+						c = <-taken
+					}*/
+			}
+		default:
+			break
 		}
 	}
 }
 
-func Make(channel chan counter, models manufacturer) {
+func Make(producerMessages chan counter, models manufacturer) {
 	for _, element := range models.models {
-		channel <- counter{element.price, element.quantity}
+		producerMessages <- counter{element.price, element.quantity}
 	}
 }
 
-func Valdytojas(userChannels chan counter, producerChannels chan counter, done chan bool, buff *buffer, taken chan counter) {
+func Valdytojas(userChannels chan counter, producerChannels chan counter, done chan bool, buff *buffer, taken chan counter, howMuch int, removes int) {
 
-	for i := 0; i < 50000; i++ {
+	for i, j := 0, 0; i < howMuch && j <= removes+2; {
 		select {
 		case counter := <-producerChannels:
-			buff.Add(&counter)
+			{
+				buff.Add(&counter)
+				fmt.Println("received from producers ", i, j, counter)
+				fmt.Println(buff.buff)
+				i++
+			}
 		case counter := <-userChannels:
 			{
+				fmt.Println("received form users", i, counter)
 				counter.count -= buff.Take(&counter)
-				taken <- counter
+				if counter.count < 1 {
+					j++
+				} else {
+					taken <- counter
+				}
 			}
 
 		default:
+
+			//fmt.Println("no one is communicating ")
 		}
 	}
 
@@ -260,11 +286,23 @@ func Valdytojas(userChannels chan counter, producerChannels chan counter, done c
 func main() {
 	done := make(chan bool, 1)
 
+	var howMuch int = 0
+	var removes int = 0
+
 	var buff buffer
 	var AllModels []manufacturer
 	var Users []counterSlice
 
 	AllModels, Users = ReadFile()
+
+	for _, el := range AllModels {
+		howMuch += len(el.models)
+	}
+
+	for _, el := range Users {
+		removes += len(el)
+	}
+	fmt.Println(removes)
 
 	PrintTable(AllModels, Users)
 
@@ -279,12 +317,10 @@ func main() {
 	for _, element := range AllModels {
 		go Make(producerMessages, element)
 	}
-
 	for _, element := range Users {
 		go Use(consumerMessages, element, taken)
 	}
-
-	go Valdytojas(consumerMessages, producerMessages, done, &buff, taken)
+	go Valdytojas(consumerMessages, producerMessages, done, &buff, taken, howMuch, removes)
 
 	<-done
 	buff.Print()
