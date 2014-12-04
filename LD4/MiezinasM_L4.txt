@@ -1,0 +1,30 @@
+Hasegawa 5
+Datsun240Z				3		20.49
+Lancia037				1		30.18
+LanciaStratos			2		20.99
+MiniCooper				10		19.99
+NissanMID4				1		40.99
+Revell 5
+MiniCooper				10		19.99
+RedBullRB7				6		20.99
+JaguarXK-E				2		19.99
+BMWM3DTM				4		19.99
+NissanMID4				1		40.99
+Fujimi 5
+ToyotaChaser			2		35.99
+NissanMID4				1		40.99
+Porsche917K				3		80.29
+BMWM3DTM				4		19.99
+RedBullRB7				6		20.99
+Airfix 5
+ToyotaChased			2		35.99
+NissanMID4				1		40.99
+Porsche917K				3		80.29
+BMWM3DTM				4		19.99
+RedBullRB7				6		20.99
+Aoshima 5
+ToyotaChasing			2		35.99
+NissanMID4				1		40.99
+Porsche917K				3		80.29
+BMWM3DTM				4		19.99
+RedBullRB7				6		20.99
