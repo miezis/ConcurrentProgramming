@@ -1,3 +1,19 @@
+/*
+Mantas Miežinas, IFF-2
+LD3a
+
+Deja, nemanau, kad tokią užduotį neįmanoma realizuoti pasitelkiant go sinchroninius kanalus,
+viskas yra gražu, kol reikia pasirašyti alternatyvą, o tam būdo su sinchroninių kanalų masyvais
+neradau, užtat naudojant asinchroninius kanalus viskas gaunasi natūraliai, nes užduoties furmoluotė
+natūraliai turėtų būti sprendžiama su buferizuotais kanalais (mano nuomonė). Tad ši programa nėra lygiagreti,
+nes iteruojama per siuntėjų kanalus bei vartotojų kanalus ir galiausiai gaunama deadlock. Jei aš klystu ir spręndimas
+su sinchroniniais kanalais yra galimas go kalboje, prašau paaiškinkite?
+
+Neesu pirmas susidūręs su tokia problema:
+
+https://groups.google.com/forum/#!topic/golang-nuts/WDdWXO07Lj0
+*/
+
 package main
 
 import "fmt"
@@ -37,6 +53,13 @@ type counter struct {
 
 type counterSlice []counter
 
+/*
+============================================================================
+
+	Esamo skaitliuko pozicijos radimas, jei tokio nera, grazinama -1
+
+============================================================================
+*/
 func (slice *counterSlice) find(value float32) int {
 	for pos, v := range *slice {
 		if v.price == value {
@@ -46,24 +69,44 @@ func (slice *counterSlice) find(value float32) int {
 	return -1
 }
 
+/*
+============================================================================
+
+	Funkcija rasti pozicija, i kuria reikia iterpti skaitliuka,
+	jei pozicija pabaigoje slice'o, tuomet graziname -1
+
+============================================================================
+*/
 func (slice *counterSlice) getPos(value float32) int {
-	curPos := 0
 	for pos, v := range *slice {
-		if v.price < value {
-			curPos = pos
-		} else {
-			return curPos
+		if v.price > value {
+			return pos
 		}
 	}
 	return -1
 }
 
+/*
+============================================================================
+
+	konteinerine struktura, skirta saugoti modeliams
+
+============================================================================
+*/
 type manufacturer struct {
 	name     string
 	quantity uint
 	models   []model
 }
 
+/*
+============================================================================
+
+	struktura, skirta bendrai atminciai, su pagalbiniais metodais:
+	Add, Take ir Print
+
+============================================================================
+*/
 type buffer struct {
 	buff counterSlice
 }
@@ -77,6 +120,10 @@ func (b *buffer) Add(c *counter) {
 			if j == -1 {
 				b.buff = append(b.buff, *c)
 			} else {
+				//b.buff[j] = *c
+
+				b.buff = append(b.buff, counter{})
+				copy(b.buff[j+1:], b.buff[j:])
 				b.buff[j] = *c
 			}
 		}
@@ -102,16 +149,18 @@ func (b *buffer) Take(c *counter) uint {
 			var j uint
 			if b.buff[i].count >= c.count {
 				j = c.count
-				b.buff[i].count -= c.count
 			} else {
 				j = b.buff[i].count
-				b.buff[i].count -= j
 
-				copy(b.buff[:i-1], b.buff[i:])
-				b.buff[len(b.buff)-1] = counter{}
-				b.buff = b.buff[:len(b.buff)-1]
 				//b.buff[] = append(b.buff[:i-1], b.buff[i:])
 			}
+			b.buff[i].count -= j
+			if b.buff[i].count <= 0 {
+				copy(b.buff[i:], b.buff[i+1:])
+				b.buff[len(b.buff)-1] = counter{}
+				b.buff = b.buff[:len(b.buff)-1]
+			}
+
 			return j
 		}
 	}
@@ -124,6 +173,13 @@ func (b *buffer) Print() {
 	}
 }
 
+/*
+============================================================================
+
+	Pagalbine funkcija, tikrini klaidoms
+
+============================================================================
+*/
 func check(e error) {
 	if e != nil {
 		panic(e)
@@ -195,6 +251,13 @@ func ReadFile() ([]manufacturer, []counterSlice) {
 	return Allmodels, users
 }
 
+/*
+============================================================================
+PrintTable
+
+	Atspausdina pradinius duomenis lentelemis
+============================================================================
+*/
 func PrintTable(printOut []manufacturer, users []counterSlice) {
 	fmt.Println("-----------------------------Pradiniai Duomenys------------------------------")
 	for _, element := range printOut {
@@ -218,31 +281,98 @@ func PrintTable(printOut []manufacturer, users []counterSlice) {
 	}
 }
 
-func Use(channel chan counter, user counterSlice, isDone chan bool) {
+func Use(channel chan counter, user counterSlice, taken chan counter) {
 	for i := range user {
 		channel <- user[i]
-		<-isDone
+	consume:
+		select {
+		case c := <-taken:
+			{
+				channel <- c
+				goto consume
+			}
+		default:
+			break
+		}
+		//<-channel
 	}
 }
 
 func Make(channel chan counter, models manufacturer) {
 	for _, element := range models.models {
 		channel <- counter{element.price, element.quantity}
+		//<-channel
 	}
 }
 
-func Valdytojas(userChannels []chan counter, producerChannels []chan counter, isDone []chan bool, done chan bool, buff *buffer) {
+func Valdytojas(userChannels []chan counter, producerChannels []chan counter, taken []chan counter, done chan bool, buff *buffer, howMuch int, removes int) {
 
-	for _, channel := range producerChannels {
-		counter := <-channel
-		buff.Add(&counter)
-	}
+	for i := 0; i < howMuch+removes; {
+		select { //Alternatyvos pasirinkimas
+		case counter := <-producerChannels[0]: //Siuo atveju priimame duomenis is gamintoju ir dedame i bendraja atmint
+			{
+				buff.Add(&counter)
+				i++
+			}
+		case counter := <-producerChannels[1]: //Siuo atveju priimame duomenis is gamintoju ir dedame i bendraja atmint
+			{
+				buff.Add(&counter)
+				i++
+			}
+		case counter := <-producerChannels[2]: //Siuo atveju priimame duomenis is gamintoju ir dedame i bendraja atmint
+			{
+				buff.Add(&counter)
+				i++
+			}
+		case counter := <-producerChannels[3]: //Siuo atveju priimame duomenis is gamintoju ir dedame i bendraja atmint
+			{
+				buff.Add(&counter)
+				i++
+			}
+		case counter := <-producerChannels[4]: //Siuo atveju priimame duomenis is gamintoju ir dedame i bendraja atmint
+			{
+				buff.Add(&counter)
+				i++
+			}
+		case counter := <-userChannels[0]: //Siuo atveju priimame duomenis is vartotoju ir isimame imanoma kieki
+			{ //elemento is bendros atminties, jei lieka neisimtu, siunciame counter objekta atgal (su likuciu)
+				counter.count -= buff.Take(&counter)
+				if counter.count == 0 {
+					i++
+				} else {
+					taken[0] <- counter
+				}
+			}
+		case counter := <-userChannels[1]: //Siuo atveju priimame duomenis is vartotoju ir isimame imanoma kieki
+			{ //elemento is bendros atminties, jei lieka neisimtu, siunciame counter objekta atgal (su likuciu)
+				counter.count -= buff.Take(&counter)
+				if counter.count == 0 {
+					i++
+				} else {
+					taken[1] <- counter
+				}
+			}
+		case counter := <-userChannels[2]: //Siuo atveju priimame duomenis is vartotoju ir isimame imanoma kieki
+			{ //elemento is bendros atminties, jei lieka neisimtu, siunciame counter objekta atgal (su likuciu)
+				counter.count -= buff.Take(&counter)
+				if counter.count == 0 {
+					i++
+				} else {
+					taken[2] <- counter
+				}
+			}
+		case counter := <-userChannels[3]: //Siuo atveju priimame duomenis is vartotoju ir isimame imanoma kieki
+			{ //elemento is bendros atminties, jei lieka neisimtu, siunciame counter objekta atgal (su likuciu)
+				counter.count -= buff.Take(&counter)
+				if counter.count == 0 {
+					i++
+				} else {
+					taken[3] <- counter
+				}
+			}
 
-	for i, channel := range userChannels {
-		counter := <-channel
-		counter.count -= buff.Take(&counter)
-		if counter.count == 0 {
-			isDone[i] <- true
+		default:
+			break
 		}
 	}
 
@@ -251,7 +381,10 @@ func Valdytojas(userChannels []chan counter, producerChannels []chan counter, is
 }
 
 func main() {
-	done := make(chan bool)
+	done := make(chan bool, 1)
+
+	var howMuch int = 0
+	var removes int = 0
 
 	var buff buffer
 	var AllModels []manufacturer
@@ -259,11 +392,20 @@ func main() {
 
 	AllModels, Users = ReadFile()
 
+	for _, el := range AllModels {
+		howMuch += len(el.models)
+	}
+
+	for _, el := range Users {
+		removes += len(el)
+	}
+	fmt.Println(removes)
+
 	PrintTable(AllModels, Users)
 
 	var producerMessages []chan counter
 	var consumerMessages []chan counter
-	var isDone []chan bool
+	var taken []chan counter
 
 	for i := 0; i < len(AllModels); i++ {
 		producerMessages = append(producerMessages, make(chan counter))
@@ -271,22 +413,17 @@ func main() {
 
 	for i := 0; i < len(Users); i++ {
 		consumerMessages = append(consumerMessages, make(chan counter))
-		isDone = append(isDone, make(chan bool))
+		taken = append(taken, make(chan counter))
 	}
-	fmt.Println(len(isDone))
-	fmt.Println(len(producerMessages))
-	fmt.Println(len(consumerMessages))
-
-	go Valdytojas(consumerMessages, producerMessages, isDone, done, &buff)
 
 	for i, element := range AllModels {
 		go Make(producerMessages[i], element)
 	}
 
 	for i, element := range Users {
-		go Use(consumerMessages[i], element, isDone[i])
+		go Use(consumerMessages[i], element, taken[i])
 	}
-
+	go Valdytojas(consumerMessages, producerMessages, taken, done, &buff, howMuch, removes)
 	<-done
 	buff.Print()
 }
